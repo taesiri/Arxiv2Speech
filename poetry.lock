@@ -85,6 +85,32 @@ tests-no-zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "c
 tests_no_zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "cloudpickle", "mypy (>=0.971,<0.990)", "pytest-mypy-plugins"]
 
 [[package]]
+name = "beautifulsoup4"
+version = "4.12.2"
+description = "Screen-scraping library"
+category = "main"
+optional = false
+python-versions = ">=3.6.0"
+
+[package.dependencies]
+soupsieve = ">1.2"
+
+[package.extras]
+html5lib = ["html5lib"]
+lxml = ["lxml"]
+
+[[package]]
+name = "bs4"
+version = "0.0.1"
+description = "Dummy package for Beautiful Soup"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+beautifulsoup4 = "*"
+
+[[package]]
 name = "certifi"
 version = "2022.12.7"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -608,6 +634,14 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
+name = "soupsieve"
+version = "2.4"
+description = "A modern CSS selector implementation for Beautiful Soup."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -697,7 +731,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10.0,<3.11"
-content-hash = "2608dd4f0dc4d42e49484cb55e69888ff2e8a7ee0258c10bbd86808771000abf"
+content-hash = "d9f1342a0e2e4a5a87ce761512b1df123098ff029d0719e863d571c5404dfc8a"
 
 [metadata.files]
 aiohttp = []
@@ -706,6 +740,8 @@ argon2-cffi = []
 argon2-cffi-bindings = []
 async-timeout = []
 attrs = []
+beautifulsoup4 = []
+bs4 = []
 certifi = []
 cffi = []
 charset-normalizer = []
@@ -748,6 +784,7 @@ replit-python-lsp-server = []
 requests = []
 rope = []
 six = []
+soupsieve = []
 toml = []
 tomli = []
 typing-extensions = []

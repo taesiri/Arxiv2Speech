@@ -9,6 +9,20 @@ import matplotlib.pyplot as plt
 from shutil import which
 import tempfile
 import subprocess
+from bs4 import BeautifulSoup
+from pathlib import Path
+import shutil
+
+
+def extract_arxiv_title(url):
+  response = requests.get(url)
+  response.raise_for_status()
+
+  soup = BeautifulSoup(response.text, "html.parser")
+  title = soup.find("h1", class_="title mathjax").text.replace("Title:",
+                                                               "").strip()
+
+  return title
 
 
 def extract_arxiv_abstract(url):
@@ -60,43 +74,45 @@ def arxiv_abstract_to_speech(arxiv_url, api_key):
   return response
 
 
-def abstract_to_pdf(abstract, output_filename='abstract.pdf'):
-  if not which("pdflatex"):
-    raise Exception("pdflatex not found. Please install TeX Live or MiKTeX.")
-
+def abstract_to_pdf(title, abstract, output_filename):
   latex_template = r"""
-        \documentclass{{standalone}}
-        \usepackage[utf8]{{inputenc}}
-        \usepackage{{amsmath}}
-        \usepackage{{amssymb}}
-        \usepackage{{hyperref}}
-        \usepackage{{varwidth}}
-        \begin{{document}}
-        \begin{{varwidth}}{{\linewidth}}
-        {content}
-        \end{{varwidth}}
-        \end{{document}}
-        """
+    \documentclass{{standalone}}
+    \usepackage[utf8]{{inputenc}}
+    \usepackage{{amsmath}}
+    \usepackage{{amssymb}}
+    \usepackage{{hyperref}}
+    \usepackage{{varwidth}}
+    \usepackage{{adjustbox}}
+    \begin{{document}}
+    \begin{{adjustbox}}{{margin=5mm}}
+    \begin{{varwidth}}{{\linewidth}}
+    \textbf{{{title}}} \\
+    {content}
+    \end{{varwidth}}
+    \end{{adjustbox}}
+    \end{{document}}
+    """
 
-  latex_content = latex_template.format(content=abstract)
+  latex_content = latex_template.format(title=title, content=abstract)
 
   with tempfile.TemporaryDirectory() as temp_dir:
-    tex_file = os.path.join(temp_dir, "abstract.tex")
+    tex_file = Path(temp_dir) / "abstract.tex"
+    pdf_file = Path(temp_dir) / "abstract.pdf"
+
     with open(tex_file, "w") as f:
       f.write(latex_content)
 
-    cmd = [
-      "pdflatex", "-interaction=batchmode", "-output-directory", temp_dir,
+    subprocess.run([
+      "pdflatex", "-interaction=nonstopmode", "-output-directory", temp_dir,
       tex_file
-    ]
-    subprocess.run(cmd, check=True)
+    ],
+                   check=True)
 
-    pdf_file = os.path.join(temp_dir, "abstract.pdf")
-    os.rename(pdf_file, output_filename)
+    shutil.copy(pdf_file, output_filename)
 
 
 # Example usage:
-arxiv_url = 'https://arxiv.org/abs/2304.03279'
+arxiv_url = 'https://arxiv.org/abs/2303.12712'
 api_key = 'xXx'
 
 # response = arxiv_abstract_to_speech(arxiv_url, api_key)
@@ -106,5 +122,6 @@ api_key = 'xXx'
 # with open('abstract.mp3', 'wb') as f:
 #   f.write(response.content)
 
+title = extract_arxiv_title(arxiv_url)
 abstract = extract_arxiv_abstract(arxiv_url)
-abstract_to_pdf(abstract, 'abstractx.pdf')
+abstract_to_pdf(title, abstract, 'abstract.pdf')

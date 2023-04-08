@@ -1,5 +1,7 @@
 { pkgs }: {
   deps = [
+    pkgs.texlive.combined.scheme-full
+    pkgs.htop
     pkgs.sudo
     pkgs.python310Full
     pkgs.replitPackages.prybar-python310
