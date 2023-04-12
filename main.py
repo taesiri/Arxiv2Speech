@@ -12,70 +12,76 @@ import subprocess
 from bs4 import BeautifulSoup
 from pathlib import Path
 import shutil
+import gradio as gr
+import io
+from pdf2image import convert_from_path
+from PIL import Image
+
+
+def pdf_to_pil_images(pdf_path, dpi=200):
+    # Convert the PDF to a sequence of PIL images
+    pil_images = convert_from_path(pdf_path, dpi=dpi)
+    return pil_images
 
 
 def extract_arxiv_title(url):
-  response = requests.get(url)
-  response.raise_for_status()
+    response = requests.get(url)
+    response.raise_for_status()
 
-  soup = BeautifulSoup(response.text, "html.parser")
-  title = soup.find("h1", class_="title mathjax").text.replace("Title:",
-                                                               "").strip()
+    soup = BeautifulSoup(response.text, "html.parser")
+    title = soup.find("h1", class_="title mathjax").text.replace("Title:", "").strip()
 
-  return title
+    return title
 
 
 def extract_arxiv_abstract(url):
-  # Extract the arXiv paper ID from the URL
-  paper_id = url.split('/')[-1]
+    # Extract the arXiv paper ID from the URL
+    paper_id = url.split("/")[-1]
 
-  # Define the arXiv API URL
-  arxiv_api_url = f'http://export.arxiv.org/api/query?id_list={paper_id}'
+    # Define the arXiv API URL
+    arxiv_api_url = f"http://export.arxiv.org/api/query?id_list={paper_id}"
 
-  # Send a GET request to the arXiv API
-  response = requests.get(arxiv_api_url)
+    # Send a GET request to the arXiv API
+    response = requests.get(arxiv_api_url)
 
-  # Check if the request was successful
-  if response.status_code == 200:
-    # Parse the XML response
-    root = ET.fromstring(response.content)
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Parse the XML response
+        root = ET.fromstring(response.content)
 
-    # Extract the abstract from the parsed XML
-    for entry in root.findall('{http://www.w3.org/2005/Atom}entry'):
-      abstract = entry.find('{http://www.w3.org/2005/Atom}summary').text
+        # Extract the abstract from the parsed XML
+        for entry in root.findall("{http://www.w3.org/2005/Atom}entry"):
+            abstract = entry.find("{http://www.w3.org/2005/Atom}summary").text
 
-    return abstract.strip()
-  else:
-    return f'Error: Unable to fetch data from arXiv API. Status code: {response.status_code}'
+        return abstract.strip()
+    else:
+        return f"Error: Unable to fetch data from arXiv API. Status code: {response.status_code}"
 
 
 def text_to_speech(abstract, api_key):
-  url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"
-  headers = {
-    "accept": "audio/mpeg",
-    "xi-api-key": api_key,
-    "Content-Type": "application/json"
-  }
-  payload = {
-    "text": abstract,
-    "voice_settings": {
-      "stability": 0,
-      "similarity_boost": 0
+    url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"
+    headers = {
+        "accept": "audio/mpeg",
+        "xi-api-key": api_key,
+        "Content-Type": "application/json",
     }
-  }
-  response = requests.post(url, headers=headers, json=payload)
+    payload = {
+        "text": abstract,
+        "voice_settings": {"stability": 0, "similarity_boost": 0},
+    }
+    response = requests.post(url, headers=headers, json=payload)
 
-  return response
+    return response
 
 
 def arxiv_abstract_to_speech(arxiv_url, api_key):
-  abstract = extract_arxiv_abstract(arxiv_url)
-  response = text_to_speech(abstract, api_key)
-  return response
+    abstract = extract_arxiv_abstract(arxiv_url)
+    response = text_to_speech(abstract, api_key)
+    return response
 
 
 def abstract_to_pdf(title, abstract, output_filename):
-  latex_template = r"""
+    latex_template = r"""
     \documentclass{{standalone}}
     \usepackage[utf8]{{inputenc}}
     \usepackage{{amsmath}}
@@ -93,35 +99,79 @@ def abstract_to_pdf(title, abstract, output_filename):
     \end{{document}}
     """
 
-  latex_content = latex_template.format(title=title, content=abstract)
+    latex_content = latex_template.format(title=title, content=abstract)
 
-  with tempfile.TemporaryDirectory() as temp_dir:
-    tex_file = Path(temp_dir) / "abstract.tex"
-    pdf_file = Path(temp_dir) / "abstract.pdf"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        tex_file = Path(temp_dir) / "abstract.tex"
+        pdf_file = Path(temp_dir) / "abstract.pdf"
 
-    with open(tex_file, "w") as f:
-      f.write(latex_content)
+        with open(tex_file, "w") as f:
+            f.write(latex_content)
 
-    subprocess.run([
-      "pdflatex", "-interaction=nonstopmode", "-output-directory", temp_dir,
-      tex_file
-    ],
-                   check=True)
+        subprocess.run(
+            [
+                "pdflatex",
+                "-interaction=nonstopmode",
+                "-output-directory",
+                temp_dir,
+                tex_file,
+            ],
+            check=True,
+        )
 
-    shutil.copy(pdf_file, output_filename)
+        shutil.copy(pdf_file, output_filename)
 
 
-# Example usage:
-arxiv_url = 'https://arxiv.org/abs/2303.12712'
-api_key = 'xXx'
+def generate_abstract(arxiv_url):
+    paper_id = arxiv_url.split("/")[-1]
+    title = extract_arxiv_title(arxiv_url)
+    abstract = extract_arxiv_abstract(arxiv_url)
 
-# response = arxiv_abstract_to_speech(arxiv_url, api_key)
-# print(response.status_code)
+    pdf_filename = f"./tmp/{paper_id}.pdf"
+    audio_filename = f"./tmp/{paper_id}.mp3"
 
-# # Save the response content (audio file) to disk
-# with open('abstract.mp3', 'wb') as f:
-#   f.write(response.content)
+    abstract_to_pdf(title, abstract, pdf_filename)
 
-title = extract_arxiv_title(arxiv_url)
-abstract = extract_arxiv_abstract(arxiv_url)
-abstract_to_pdf(title, abstract, 'abstract.pdf')
+    # convert pdf to image
+    abstract_image = pdf_to_pil_images(pdf_filename)[0]
+
+    return abstract_image
+
+
+def generate_audio(arxiv_url, api_key):
+    paper_id = arxiv_url.split("/")[-1]
+    audio_filename = f"./tmp/{paper_id}.mp3"
+
+    response = arxiv_abstract_to_speech(arxiv_url, api_key)
+
+    with open(audio_filename, "wb") as f:
+        f.write(response.content)
+
+    return audio_filename
+
+
+# use blocks API
+with gr.Blocks() as app:
+    arxiv_link = gr.Textbox(
+        label="paper link",
+        lines=1,
+        placeholder="https://arxiv.org/abs/2303.12712",
+    )
+    abstract_btn = gr.Button(label="Generate")
+    output_image = gr.Image(label="abstract image")
+    elevn_api_key = gr.Textbox(
+        label="ElevenLabs API key", lines=1, placeholder="ElevenLabs API key"
+    )
+    audio_btn = gr.Button(label="Generate audio")
+    generated_sound = gr.Audio(
+        label="abstract audio",
+        type="filepath",
+    )
+
+    abstract_btn.click(generate_abstract, inputs=[arxiv_link], outputs=[output_image])
+    audio_btn.click(
+        generate_audio, inputs=[arxiv_link, elevn_api_key], outputs=[generated_sound]
+    )
+
+
+app.launch()
