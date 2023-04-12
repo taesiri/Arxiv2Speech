@@ -16,6 +16,32 @@ import gradio as gr
 import io
 from pdf2image import convert_from_path
 from PIL import Image
+from moviepy.editor import *
+from PIL import Image
+import tempfile
+import os
+
+
+def create_video(pil_image: Image, mp3_path: str, output_path: str):
+    # Create a temporary file for the image
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_image:
+        pil_image.save(temp_image, format="PNG")
+        temp_image_path = temp_image.name
+
+    # Load the image and set its duration to match the audio duration
+    image_clip = ImageClip(temp_image_path, duration=AudioFileClip(mp3_path).duration)
+
+    # Set the fps attribute for the image clip
+    image_clip.fps = 24
+
+    # Set the audio to the image clip
+    image_clip = image_clip.set_audio(AudioFileClip(mp3_path))
+
+    # Write the video file
+    image_clip.write_videofile(output_path, codec="libx264", audio_codec="aac")
+
+    # Remove the temporary image file
+    os.remove(temp_image_path)
 
 
 def pdf_to_pil_images(pdf_path, dpi=200):
@@ -150,6 +176,20 @@ def generate_audio(arxiv_url, api_key):
     return audio_filename
 
 
+def generate_video(arxiv_url):
+    paper_id = arxiv_url.split("/")[-1]
+
+    pdf_filename = f"./tmp/{paper_id}.pdf"
+    audio_filename = f"./tmp/{paper_id}.mp3"
+    movie_filename = f"./tmp/{paper_id}.mp4"
+
+    abstract_image = pdf_to_pil_images(pdf_filename)[0]
+
+    create_video(abstract_image, audio_filename, movie_filename)
+
+    return movie_filename
+
+
 # use blocks API
 with gr.Blocks() as app:
     arxiv_link = gr.Textbox(
@@ -163,15 +203,19 @@ with gr.Blocks() as app:
         label="ElevenLabs API key", lines=1, placeholder="ElevenLabs API key"
     )
     audio_btn = gr.Button(label="Generate audio")
-    generated_sound = gr.Audio(
+    output_audio = gr.Audio(
         label="abstract audio",
         type="filepath",
     )
 
+    video_btn = gr.Button(label="Generate video")
+    output_video = gr.Video()
+
     abstract_btn.click(generate_abstract, inputs=[arxiv_link], outputs=[output_image])
     audio_btn.click(
-        generate_audio, inputs=[arxiv_link, elevn_api_key], outputs=[generated_sound]
+        generate_audio, inputs=[arxiv_link, elevn_api_key], outputs=[output_audio]
     )
+    video_btn.click(generate_video, inputs=[arxiv_link], outputs=[output_video])
 
 
 app.launch()
